@@ -75,14 +75,13 @@ class Ponggame:
     def reset_run(self):
         pass
 
-    def handle_events(self):
-        keys = pygame.key.get_pressed()
+    def handle_events(self, keys):
         if keys[pygame.K_SPACE]:
             self.game_started = True
 
 
 class Paddle:
-    def __init__(self, color, left, top):
+    def __init__(self, color, left, top, move_up, move_down):
         self.width = 10
         self.height = 100
         self.color = color
@@ -92,6 +91,8 @@ class Paddle:
         self.rect_paddle = pygame.Rect((self.left, self.top, self.width, self.height))
         # Distance parcourut
         self.dist = 15
+        self.move_up = move_up
+        self.move_down = move_down
 
     def draw_rect_mov(self, x, y):
         self.rect_paddle = self.rect_paddle.move(x * self.dist, y * self.dist)
@@ -101,20 +102,18 @@ class Paddle:
     def draw(self):
         pygame.draw.rect(screan, self.color, self.rect_paddle)
 
-    def handle_keys(self):
-        # DISTINCTION ENTRE JOUEUR A ET B !!!
-        keys = pygame.key.get_pressed()
+    def handle_keys(self, keys):
         if self.test_border() not in [0, 1]:
-            if keys[pygame.K_UP]:
+            if keys[self.move_up]:
                 self.draw_rect_mov(0, -1)
-            if keys[pygame.K_DOWN]:
+            if keys[self.move_down]:
                 self.draw_rect_mov(0, 1)
         else:
             if self.test_border() == 0:
-                if keys[pygame.K_DOWN]:
+                if keys[self.move_down]:
                     self.draw_rect_mov(0, 1)
             elif self.test_border() == 1:
-                if keys[pygame.K_UP]:
+                if keys[self.move_up]:
                     self.draw_rect_mov(0, -1)
 
     def test_border(self) -> int:
@@ -186,8 +185,8 @@ clock = pygame.time.Clock()
 # Set up
 
 game = Ponggame(5)
-paddle_A = Paddle((240, 255, 255), 20, 300)
-paddle_B = Paddle((240, 255, 255), 1170, 300)
+paddle_A = Paddle((240, 255, 255), 20, 300, pygame.K_z, pygame.K_s)
+paddle_B = Paddle((240, 255, 255), 1170, 300, pygame.K_UP, pygame.K_DOWN)
 ball = Ball((240, 250, 250), 10, 15)
 
 
@@ -202,19 +201,22 @@ if __name__ == '__main__':
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        # PRESS SPACE
-        game.handle_events()
 
+        # PRESS SPACE
+        key = pygame.key.get_pressed()
+        game.handle_events(keys=key)
         screan.fill("black")
 
         # Game Start
         if game.game_started:
+            # La partie DRAW
             game.draw_midline((240, 255, 255))
             game.draw_score((200, 250, 250))
             paddle_A.draw()
             paddle_B.draw()
-            paddle_A.handle_keys()
-            paddle_B.handle_keys()
+            # La partie mouvements
+            paddle_A.handle_keys(keys=key)
+            paddle_B.handle_keys(keys=key)
 
             ball.draw()
             ball.draw_ball_move()
