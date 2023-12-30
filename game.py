@@ -50,15 +50,19 @@ class Ponggame:
             if ball.check_points() == "A LOSE":
                 self.score_B += 1
                 self.reset_ball_position()
+                return True
             elif ball.check_points() == "B LOSE":
                 self.score_A += 1
                 self.reset_ball_position()
+                return True
         elif self.check_scoring():
             # YOU WIN
             # YOU LOSE
             self.score_A = 0
             self.score_B = 0
             self.reset_ball_position()
+            return True
+        return False
 
     def check_scoring(self):
         if self.score_A >= self.score_max:
@@ -69,6 +73,7 @@ class Ponggame:
 
     @staticmethod
     def reset_ball_position():
+        # ball.pos = pygame.Vector2(ball.x, ball.y)
         ball.pos = pygame.Vector2(ball.x, ball.y)
         pygame.time.wait(300)
 
@@ -164,7 +169,7 @@ class Ball:
         max_X = width
         min_X = 0
 
-        # Le joueur B a perdu
+        # Le joueur B a perdu.
         if self.pos.x + self.rad > max_X:
             return "B LOSE"
         # Le joueur A a perdu

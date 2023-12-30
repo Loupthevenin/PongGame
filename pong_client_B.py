@@ -1,103 +1,78 @@
-import socket
-import threading
-import pickle
 from utils import *
 from game import Ponggame, Paddle, Ball
+from network import Network
 
 
 class PongClient:
-    def __init__(self, host, port, player):
-        self.host = host
-        self.port = port
-        self.player = player
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def __init__(self):
+        self.net = Network(server=host_server, port=port_server)
 
         # Init Pygame
-        pygame.init()
-        self.clock = pygame.time.Clock()
         self.screan = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("Pong HEY !!!")
 
         # Set up
         self.game = Ponggame(round_point)
-        self.paddle_A = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_z, move_down=pygame.K_s)
+        self.paddle_A = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
         self.paddle_B = Paddle(color=color_paddle, left=left_B, top=top_B, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
         self.ball = Ball(color=color_ball, rad=rad, speed=speed)
 
-        # server
-        self.paddle_A_y = height / 2 - self.paddle_A.height / 2
-        self.paddle_B_y = height / 2 - self.paddle_B.height / 2
-        self.ball_pos = {"x": width / 2, "y": height / 2}
+    def send_data(self, type):
+        if type == "paddle":
+            data = str(self.net.id) + ":" + str(self.paddle_B.rect_paddle.x) + "," + str(self.paddle_B.rect_paddle.y)
+            reply = self.net.send(data)
+            return reply
+        elif type == "ball":
+            data = str(self.net.id) + ":" + str(self.ball.pos.x) + "," + str(self.ball.pos.y)
+            reply = self.net.send(data)
+            return reply
 
-    def connect(self):
-        self.client_socket.connect((self.host, self.port))
-        print("Connected to server")
-
-        # Démarrer un thread pour recevoir les mises à jour du serveur
-        receive_thread = threading.Thread(target=self.receive_messages)
-        receive_thread.start()
-
-    def receive_messages(self):
+    @staticmethod
+    def parse_data(data):
         try:
-            while True:
-                data = self.client_socket.recv(1024)
-                if not data:
-                    break
-                message = pickle.loads(data)
-                print(f"Received message: {message}")
-
-                if message["type"] == "update":
-                    self.paddle_A_y = message["data"]["paddle_A_y"]
-                    self.paddle_B_y = message["data"]["paddle_B_y"]
-                    self.ball_pos = message["data"]["ball_pos"]
-                # Traiter la mise à jour de l'état du jeu (par exemple, dessiner les raquettes et la balle)
-
-        except Exception as e:
-            print(f"Error receiving messages: {e}")
-        finally:
-            self.client_socket.close()
-
-    def send_message(self, message):
-        self.client_socket.send(pickle.dumps(message))
+            d = data.split(":")[1].split(",")
+            return int(d[0]), int(d[1])
+        except:
+            return 0, 0
 
     def run_game(self):
+        pygame.init()
+        pygame.display.set_caption("Pong HEY !!!")
+        clock = pygame.time.Clock()
         run = True
+
         while run:
+            self.screan.fill(color_screan)
+            clock.tick(tick)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
+
             keys = pygame.key.get_pressed()
-            if self.player == "A":
-                update_data = {"type": "input", "data": {"move_up": keys[pygame.K_w], "move_down": keys[pygame.K_s]}}
-                self.send_message(update_data)
-            elif self.player == "B":
-                update_data = {"type": "input", "data": {"move_up": keys[pygame.K_UP], "move_down": keys[pygame.K_DOWN]}}
-                self.send_message(update_data)
 
-            self.screan.fill(color_screan)
-            pygame.display.flip()
-            self.clock.tick(tick)
+            self.game.draw_midline(color_midline)
+            self.game.draw_score(color_score)
+            self.paddle_A.draw()
+            self.paddle_B.draw()
+            self.ball.draw()
 
-            # Mets a jours les pos paddle et ball
-            try:
-                data = self.client_socket.recv(1024)
-                if data:
-                    update_data = pickle.loads(data)
+            # SEND POS PADDLE ET POS BALL
+            # ATTENTION INVERSER POUR LE CLIENT B
+            self.paddle_A.rect_paddle.x, self.paddle_A.rect_paddle.y = self.parse_data(self.send_data("paddle"))
+            # self.ball.pos.x, self.ball.pos.y = self.parse_data(self.send_data("ball"))
 
-                    self.paddle_A_y = update_data["data"]["paddle_A_y"]
-                    self.paddle_B_y = update_data["data"]["paddle_B_y"]
-                    self.ball_pos = update_data["data"]["ball_pos"]
+            self.paddle_B.handle_keys(keys)
+            self.ball.draw_ball_move()
+            self.ball.check_collision()
 
-                    # Draw
-                    self.paddle_A.draw_rect_mov(0, self.paddle_A_y)
-                    self.paddle_B.draw_rect_mov(0, self.paddle_B_y)
-                    self.ball_pos = pygame.Vector2(self.ball_pos["x"], self.ball_pos["y"])
-                    self.ball.draw()
-            except Exception as e:
-                print(f"Error receiving update from server: {e}")
+            if self.ball.check_collision():
+                self.ball.pos = pygame.Vector2(self.ball.x, self.ball.y)
+
+            pygame.display.update()
+
+        pygame.quit()
 
 
 if __name__ == '__main__':
-    client = PongClient(host_server, port_server, player_B)
-    client.connect()
+    client = PongClient()
     client.run_game()

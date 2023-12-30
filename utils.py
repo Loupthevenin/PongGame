@@ -4,11 +4,11 @@ import pygame
 width = 1200
 height = 700
 color_screan = (0, 0, 0)
-tick = 20
+tick = 60
 
 
 # server
-host_server = "172.19.11.64"
+host_server = "192.168.1.43"
 port_server = 5555
 player_A = "A"
 player_B = "B"
