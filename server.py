@@ -21,10 +21,11 @@ print("Waiting for a connection")
 currentId = "0"
 pos_paddle = [f"0:{left_A},{top_A}", f"1:{left_B},{top_B}"]
 # pos_ball = [f"0:{width/2},{height/2}", f"1:{width/2},{height/2}"]
+started_space = ["0:0", "1:0"]
 
 
 def threaded_client(conn):
-    global currentId, pos_paddle#, pos_ball
+    global currentId, pos_paddle, started_space #, pos_ball
     conn.send(str.encode(currentId))
     currentId = "1"
     reply = ''
@@ -39,16 +40,32 @@ def threaded_client(conn):
                 print("Received: " + reply)
                 arr = reply.split(":")
                 id = int(arr[0])
-                pos_paddle[id] = reply
-                # pos_ball[id] = reply
 
-                if id == 0: nid = 1
-                if id == 1: nid = 0
+                if arr[1] == "paddle":
+                    pos_paddle[id] = reply
+                    # pos_ball[id] = reply
 
-                reply = pos_paddle[nid][:]
-                print("Sending: " + reply)
+                    if id == 0: nid = 1
+                    if id == 1: nid = 0
 
-            conn.sendall(str.encode(reply))
+                    reply = pos_paddle[nid][:]
+                    print("Sending: " + reply)
+                    conn.sendall(str.encode(reply))
+                elif arr[1] == "space":
+                    print("Received: " + reply)
+                    arr = reply.split(":")
+                    id = int(arr[0])
+                    if arr[1] == "1":
+                        started_space[id] = reply
+
+                    nid = 0
+                    reply = started_space[nid][:]
+                    print("Sending: " + reply)
+                    conn.sendall(str.encode(reply))
+                    nid = 1
+                    reply = started_space[nid][:]
+                    print("Sending: " + reply)
+                    conn.sendall(str.encode(reply))
         except:
             break
 

@@ -1,6 +1,6 @@
 import pygame
 
-# screan
+# screen
 width = 1200
 height = 700
 color_screan = (0, 0, 0)
@@ -24,7 +24,7 @@ top_B = 300
 
 color_ball = (240, 250, 250)
 rad = 10
-speed = 15
+speed = 2
 
 color_midline = (240, 250, 250)
 

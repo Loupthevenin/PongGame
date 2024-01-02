@@ -1,4 +1,7 @@
+import select
 import socket
+import json
+import time
 
 
 class Network:
@@ -11,12 +14,19 @@ class Network:
 
     def connect(self):
         self.client_socket.connect(self.addr)
-        return self.client_socket.recv(2048*1).decode()
+        return int(self.client_socket.recv(1024).decode("utf-8"))
 
-    def send(self, data) -> str:
+    def get_player_id(self):
+        return self.id
+
+    def close(self):
+        self.client_socket.close()
+
+    def send(self, data):
         try:
-            self.client_socket.send(str.encode(data))
-            reply = self.client_socket.recv(2048*1).decode()
-            return reply
+            self.client_socket.sendall(json.dumps(data).encode("utf-8"))
+            reply = self.client_socket.recv(1024).decode("utf-8")
+            reply_dict = json.loads(reply)
+            return reply_dict
         except socket.error as e:
             return str(e)

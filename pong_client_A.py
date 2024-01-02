@@ -5,43 +5,74 @@ from network import Network
 
 class PongClient:
     def __init__(self):
-        self.net = Network(server=host_server, port=port_server)
+        pygame.init()
 
-        # Init Pygame
-        self.screan = pygame.display.set_mode((width, height))
+        # Init Network
+        self.net = Network(server=host_server, port=port_server)
+        self.player_id = self.net.id
+        print(self.player_id)
+
+        # Verif ID
+        if self.player_id not in [1, 2]:
+            raise ValueError(f"Invalid player_id: {self.player_id}")
+
+        self.screen = pygame.display.set_mode((width, height))
 
         # Set up
-        self.game = Ponggame(round_point)
-        self.paddle_A = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
-        self.paddle_B = Paddle(color=color_paddle, left=left_B, top=top_B, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
+        if self.player_id == 1:
+            self.paddle_player = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
+            self.paddle_next_player = Paddle(color=color_paddle, left=left_B, top=top_B, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
+        elif self.player_id == 2:
+            self.paddle_player = Paddle(color=color_paddle, left=left_B, top=top_B, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
+            self.paddle_next_player = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_UP, move_down=pygame.K_DOWN)
+
         self.ball = Ball(color=color_ball, rad=rad, speed=speed)
+        self.game = Ponggame(round_point, self.ball)
 
     def send_data(self, type):
         if type == "paddle":
-            data = str(self.net.id) + ":" + str(self.paddle_A.rect_paddle.x) + "," + str(self.paddle_A.rect_paddle.y)
+            data = {
+                "player_id": self.player_id,
+                "position": {"paddle_y": self.paddle_player.rect_paddle.y}
+            }
             reply = self.net.send(data)
             return reply
-        elif type == "ball":
-            data = str(self.net.id) + ":" + str(self.ball.pos.x) + "," + str(self.ball.pos.y)
+        elif type == "space":
+            data = {
+                "player_id": self.player_id,
+                "started": self.game.game_started
+            }
             reply = self.net.send(data)
             return reply
 
-    @staticmethod
-    def parse_data(data):
-        try:
-            d = data.split(":")[1].split(",")
-            return int(d[0]), int(d[1])
-        except:
-            return 0, 0
+    def parse_data(self, data):
+        print(f"parse: {data}")
+        if data:
+            if "position" in data:
+                try:
+                    d = data["position"]["paddle_y"]
+                    print(d)
+                    return int(d)
+                except:
+                    return self.paddle_next_player.rect_paddle.y
+            elif "started" in data:
+                try:
+                    d = data["started"]
+                    return bool(d)
+                except:
+                    return self.game.game_started
+        else:
+            return False
 
     def run_game(self):
-        pygame.init()
         pygame.display.set_caption("Pong HEY !!!")
         clock = pygame.time.Clock()
         run = True
 
+        reply = False
+
         while run:
-            self.screan.fill(color_screan)
+            self.screen.fill(color_screan)
             clock.tick(tick)
 
             for event in pygame.event.get():
@@ -49,24 +80,42 @@ class PongClient:
                     run = False
 
             keys = pygame.key.get_pressed()
+            self.game.handle_events(keys)
+            self.screen.fill("black")
 
-            self.game.draw_midline(color_midline)
-            self.game.draw_score(color_score)
-            self.paddle_A.draw()
-            self.paddle_B.draw()
-            self.ball.draw()
+            if reply or self.game.game_started:
+                self.game.draw_midline(color_midline)
+                self.game.draw_score(color_score)
+                self.paddle_player.draw()
+                self.paddle_next_player.draw()
+                self.ball.draw()
 
-            # SEND POS PADDLE ET POS BALL
-            # ATTENTION INVERSER POUR LE CLIENT B
-            self.paddle_B.rect_paddle.x, self.paddle_B.rect_paddle.y = self.parse_data(self.send_data("paddle"))
-            # self.ball.pos.x, self.ball.pos.y = self.parse_data(self.send_data("ball"))
+                # SEND POS PADDLE ET POS BALL
+                if self.player_id == 1:
+                    received_value = self.parse_data(self.send_data("paddle"))
+                    print(f"Type de la valeur reçue : {received_value}:{type(received_value)}")
+                    self.paddle_next_player.rect_paddle.y = received_value
+                # self.ball_instance.pos.x, self.ball_instance.pos.y = self.parse_data(self.send_data("ball_instance"))
+                elif self.player_id == 2:
+                    received_value = self.parse_data(self.send_data("paddle"))
+                    print(f"Type de la valeur reçue : {received_value}:{type(received_value)}")
+                    self.paddle_next_player.rect_paddle.y = received_value
 
-            self.paddle_A.handle_keys(keys)
-            self.ball.draw_ball_move()
-            if self.ball.check_collision():
-                self.ball.pos = pygame.Vector2(self.ball.x, self.ball.y)
+                self.paddle_player.handle_keys(keys)
+                self.ball.draw_ball_move()
+                self.ball.check_collision(self.paddle_player, self.paddle_next_player)
+                self.game.scoring()
 
-            pygame.display.update()
+                pygame.display.update()
+
+            else:
+                self.game.draw_start(color_start)
+                pygame.display.flip()
+
+                # SEND SPACE
+                reply = self.parse_data(self.send_data("space"))
+                print(f"reply space : {reply}")
+                print(f"game_started space : {self.game.game_started}")
 
         pygame.quit()
 

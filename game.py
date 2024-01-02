@@ -3,11 +3,12 @@ import random
 
 
 class Ponggame:
-    def __init__(self, score_max):
+    def __init__(self, score_max, ball):
         self.score_A = 0
         self.score_B = 0
         self.game_started = False
         self.score_max = score_max
+        self.ball = ball
 
     @staticmethod
     def draw_midline(line_color):
@@ -47,22 +48,18 @@ class Ponggame:
 
     def scoring(self):
         if not self.check_scoring():
-            if ball.check_points() == "A LOSE":
+            if ball_instance.check_points() == "A LOSE":
                 self.score_B += 1
-                self.reset_ball_position()
-                return True
-            elif ball.check_points() == "B LOSE":
+                self.ball.reset_ball()
+            elif ball_instance.check_points() == "B LOSE":
                 self.score_A += 1
-                self.reset_ball_position()
-                return True
+                self.ball.reset_ball()
         elif self.check_scoring():
             # YOU WIN
             # YOU LOSE
             self.score_A = 0
             self.score_B = 0
-            self.reset_ball_position()
-            return True
-        return False
+            self.ball.reset_ball()
 
     def check_scoring(self):
         if self.score_A >= self.score_max:
@@ -70,12 +67,6 @@ class Ponggame:
         if self.score_B >= self.score_max:
             return True
         return False
-
-    @staticmethod
-    def reset_ball_position():
-        # ball.pos = pygame.Vector2(ball.x, ball.y)
-        ball.pos = pygame.Vector2(ball.x, ball.y)
-        pygame.time.wait(300)
 
     def reset_run(self):
         pass
@@ -152,17 +143,19 @@ class Ball:
         self.draw()
         pygame.display.flip()
 
-    def check_collision(self):
+    def check_collision(self, paddle_A, paddle_B):
         max_Y = height
         min_Y = 0
         ball_rect = pygame.Rect(self.pos.x - self.rad, self.pos.y - self.rad, 2 * self.rad, 2 * self.rad)
+        self.paddle_A = paddle_A
+        self.paddle_B = paddle_B
 
         # Collision : mur Haut
         if self.pos.y + self.rad > max_Y or self.pos.y - self.rad < min_Y:
             self.direction.y *= -1
 
         # Collision Paddle
-        if paddle_A.rect_paddle.colliderect(ball_rect) or paddle_B.rect_paddle.colliderect(ball_rect):
+        if self.paddle_A.rect_paddle.colliderect(ball_rect) or self.paddle_B.rect_paddle.colliderect(ball_rect):
             self.direction.x *= -1
 
     def check_points(self) -> str:
@@ -175,6 +168,10 @@ class Ball:
         # Le joueur A a perdu
         elif self.pos.x - self.rad < min_X:
             return "A LOSE"
+
+    def reset_ball(self):
+        self.pos = pygame.Vector2(self.x, self.y)
+        pygame.time.wait(300)
 
 
 pygame.init()
@@ -189,11 +186,10 @@ clock = pygame.time.Clock()
 
 # Set up
 
-game = Ponggame(5)
 paddle_A = Paddle((240, 255, 255), 20, 300, pygame.K_z, pygame.K_s)
 paddle_B = Paddle((240, 255, 255), 1170, 300, pygame.K_UP, pygame.K_DOWN)
-ball = Ball((240, 250, 250), 10, 15)
-
+ball_instance = Ball((240, 250, 250), 10, 15)
+game = Ponggame(5, ball_instance)
 
 run = True
 
@@ -223,9 +219,9 @@ if __name__ == '__main__':
             paddle_A.handle_keys(keys=key)
             paddle_B.handle_keys(keys=key)
 
-            ball.draw()
-            ball.draw_ball_move()
-            ball.check_collision()
+            ball_instance.draw()
+            ball_instance.draw_ball_move()
+            ball_instance.check_collision(paddle_A, paddle_B)
 
             game.scoring()
 
