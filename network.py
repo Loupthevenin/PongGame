@@ -1,6 +1,5 @@
 import socket
 import json
-import threading
 
 
 class Network:
@@ -10,8 +9,6 @@ class Network:
         self.port = port
         self.addr = (self.server, self.port)
         self.id = self.connect()
-        self.sync_lock = threading.Lock()
-
     def connect(self):
         self.client_socket.connect(self.addr)
         return int(self.client_socket.recv(1024*4).decode("utf-8"))
@@ -21,10 +18,9 @@ class Network:
 
     def send(self, data):
         try:
-            with self.sync_lock:
-                self.client_socket.sendall(json.dumps(data).encode("utf-8"))
-                reply = self.client_socket.recv(1024*4).decode("utf-8")
-                reply_dict = json.loads(reply)
-                return reply_dict
+            self.client_socket.sendall(json.dumps(data).encode("utf-8"))
+            reply = self.client_socket.recv(1024*4).decode("utf-8")
+            reply_dict = json.loads(reply)
+            return reply_dict
         except socket.error as e:
             return str(e)
