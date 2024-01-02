@@ -1,6 +1,9 @@
 import socket
+import threading
 from _thread import *
 from utils import *
+import json
+
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -18,63 +21,67 @@ except socket.error as e:
 s.listen(2)
 print("Waiting for a connection")
 
-currentId = "0"
-pos_paddle = [f"0:{left_A},{top_A}", f"1:{left_B},{top_B}"]
-# pos_ball = [f"0:{width/2},{height/2}", f"1:{width/2},{height/2}"]
-started_space = ["0:0", "1:0"]
+player_count = 0
+connections = {}
+sync_lock = threading.Lock()
 
 
-def threaded_client(conn):
-    global currentId, pos_paddle, started_space #, pos_ball
-    conn.send(str.encode(currentId))
-    currentId = "1"
-    reply = ''
+def threaded_client(conn, player_id, sync_lock):
+    global player_count
+    print(f"Player {player_id} connected from {conn}")
+    # Envoi de l'ID
+    conn.send(str(player_id).encode())
+
+    with sync_lock:
+        connections[player_id] = conn
+
     while True:
         try:
-            data = conn.recv(2048)
-            reply = data.decode('utf-8')
+            with sync_lock:
+                data = conn.recv(2048*2).decode()
+            reply = {}
             if not data:
-                conn.send(str.encode("Goodbye"))
+                print(f"Connection with player {player_id} closed.")
                 break
             else:
-                print("Received: " + reply)
-                arr = reply.split(":")
-                id = int(arr[0])
+                reply = json.loads(data)
+                # Traiter les modifs
+                print(f"Received: {reply}")
+                with sync_lock:
+                    if "position" in reply:
+                        if reply["player_id"] == 1:
+                            if 2 in connections:
+                                connections[2].send(json.dumps(reply).encode("utf-8"))
+                        elif reply["player_id"] == 2:
+                            if 1 in connections:
+                                connections[1].send(json.dumps(reply).encode("utf-8"))
+                    elif "started" in reply:
+                        if reply["player_id"] == 1:
+                            if 2 in connections:
+                                connections[2].send(json.dumps(reply).encode("utf-8"))
+                        elif reply["player_id"] == 2:
+                            if 1 in connections:
+                                connections[1].send(json.dumps(reply).encode("utf-8"))
+                    elif "ball" in reply:
+                        if reply["player_id"] == 1:
+                            if 2 in connections:
+                                connections[2].send(json.dumps(reply).encode("utf-8"))
+                        elif reply["player_id"] == 2:
+                            if 1 in connections:
+                                connections[1].send(json.dumps(reply).encode("utf-8"))
 
-                if arr[1] == "paddle":
-                    pos_paddle[id] = reply
-                    # pos_ball[id] = reply
-
-                    if id == 0: nid = 1
-                    if id == 1: nid = 0
-
-                    reply = pos_paddle[nid][:]
-                    print("Sending: " + reply)
-                    conn.sendall(str.encode(reply))
-                elif arr[1] == "space":
-                    print("Received: " + reply)
-                    arr = reply.split(":")
-                    id = int(arr[0])
-                    if arr[1] == "1":
-                        started_space[id] = reply
-
-                    nid = 0
-                    reply = started_space[nid][:]
-                    print("Sending: " + reply)
-                    conn.sendall(str.encode(reply))
-                    nid = 1
-                    reply = started_space[nid][:]
-                    print("Sending: " + reply)
-                    conn.sendall(str.encode(reply))
-        except:
+        except Exception as e:
+            print(f"Error {player_id}: {e}")
             break
 
+    with sync_lock:
+        del connections[player_id]
     print("Connection Closed")
     conn.close()
 
 
 while True:
     conn, addr = s.accept()
+    player_count += 1
     print(f"Connected to: {addr}")
-
-    start_new_thread(threaded_client, (conn,))
+    start_new_thread(threaded_client, (conn, player_count, sync_lock))
