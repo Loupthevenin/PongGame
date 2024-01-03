@@ -12,7 +12,6 @@ class PongClient:
         self.net = Network(server=host_server, port=port_server)
         self.player_id = self.net.id
         print(self.player_id)
-        self.ready_to_start = threading.Event()
 
         # Verif ID
         if self.player_id not in [1, 2]:
@@ -54,6 +53,12 @@ class PongClient:
             }
             reply = self.net.send(data)
             return reply
+        elif type == "ready":
+            data = "READY"
+            self.net.send_start(data)
+            reply = self.net.receive()
+            print(reply)
+            return reply
 
     def parse_data(self, data):
         print(f"parse: {data}")
@@ -82,8 +87,12 @@ class PongClient:
 
     def synchronize_client(self):
         print("Waiting for synchronization signal...")
-        self.ready_to_start.wait()
-        print("Synchronization signal received. Continuing with the game.")
+        data = self.send_data("ready")
+        if data == "START":
+            print("Synchronization signal received. Continuing with the game.")
+        else:
+            print("Unexpected response for synchronization.")
+            return
 
     def run_game(self):
         pygame.init()
@@ -95,6 +104,7 @@ class PongClient:
         reply = False
 
         while run:
+            received_value = ""
             self.screen.fill(color_screan)
             clock.tick(tick)
 
@@ -118,29 +128,31 @@ class PongClient:
                 if self.player_id == 1:
                     received_value = self.parse_data(self.send_data("paddle"))
                     print(f"Type de la valeur reçue : {received_value}:{type(received_value)}")
-                    self.paddle_next_player.rect_paddle.y = received_value
+                    if type(received_value) == int:
+                        self.paddle_next_player.rect_paddle.y = received_value
+
+                    # SEND DIRECTION AND POS BALL
+                    received_value = self.parse_data(self.send_data("ball"))
+                    if type(received_value) == tuple:
+                        self.ball.pos.x, self.ball.pos.y = received_value
+                    self.ball.draw_ball_move()
+
                 elif self.player_id == 2:
                     received_value = self.parse_data(self.send_data("paddle"))
                     print(f"Type de la valeur reçue : {received_value}:{type(received_value)}")
-                    self.paddle_next_player.rect_paddle.y = received_value
+                    if type(received_value) == int:
+                        self.paddle_next_player.rect_paddle.y = received_value
+
+                    # SEND DIRECTION AND POS BALL
+                    received_value = self.parse_data(self.send_data("ball"))
+                    if type(received_value) == tuple:
+                        self.ball.pos.x, self.ball.pos.y = received_value
+                    self.ball.draw_ball_move()
 
                 self.paddle_player.handle_keys(keys)
                 self.paddle_player.draw()
                 self.paddle_next_player.draw()
 
-                # SEND DIRECTION AND POS BALL
-                if self.player_id == 1:
-                    print("ici")
-                    x, y = self.parse_data(self.send_data("ball"))
-                    self.ball.pos.x, self.ball.pos.y = x, y
-                    self.ball.draw_ball_move()
-                elif self.player_id == 2:
-                    print("ici2")
-                    x, y = self.parse_data(self.send_data("ball"))
-                    self.ball.pos.x, self.ball.pos.y = x, y
-                    self.ball.draw_ball_move()
-
-                time.sleep(0.3)
                 self.ball.check_collision(self.paddle_player, self.paddle_next_player)
                 self.game.scoring()
 

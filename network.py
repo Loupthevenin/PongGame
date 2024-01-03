@@ -9,6 +9,7 @@ class Network:
         self.port = port
         self.addr = (self.server, self.port)
         self.id = self.connect()
+
     def connect(self):
         self.client_socket.connect(self.addr)
         return int(self.client_socket.recv(1024*4).decode("utf-8"))
@@ -24,3 +25,9 @@ class Network:
             return reply_dict
         except socket.error as e:
             return str(e)
+
+    def send_start(self, data):
+        self.client_socket.sendall(data.encode())
+
+    def receive(self):
+        return self.client_socket.recv(1024).decode()
