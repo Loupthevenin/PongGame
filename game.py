@@ -6,7 +6,7 @@ class Ponggame:
     def __init__(self, score_max, ball):
         self.score_A = 0
         self.score_B = 0
-        self.game_started = False
+        self.game_started = ""
         self.score_max = score_max
         self.ball = ball
 
@@ -73,7 +73,7 @@ class Ponggame:
 
     def handle_events(self, keys):
         if keys[pygame.K_SPACE]:
-            self.game_started = True
+            self.game_started = "true"
 
 
 class Paddle:
@@ -209,7 +209,7 @@ if __name__ == '__main__':
         screan.fill("black")
 
         # Game Start
-        if game.game_started:
+        if bool(game.game_started):
             # La partie DRAW
             game.draw_midline((240, 255, 255))
             game.draw_score((200, 250, 250))

@@ -1,94 +1,99 @@
 import socket
-import time
-from _thread import *
+import threading
+
+from game import Ponggame, Paddle, Ball
 from utils import *
-import json
-from queue import Queue
 
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+class PongServer:
+    def __init__(self):
+        # Network
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server = host_server
+        self.port = port_server
+        self.socket.bind((self.server, self.port))
+        self.socket.listen(1)
+        self.client_socket, self.addr = None, None
+        self.player = 1
 
-try:
-    s.bind((host_server, port_server))
-except socket.error as e:
-    print(str(e))
+        # DATA
+        self.run = True
+        self.ball_x = width / 2
+        self.ball_y = height / 2
+        self.pos_y = top_A
+        self.screen = pygame.display.set_mode((width, height))
+        self.clock = pygame.time.Clock()
 
-s.listen(2)
-print("Waiting for a connection")
+        # Set up pygame
+        self.paddle_player = Paddle(color=color_paddle, left=left_A, top=top_A, move_up=pygame.K_UP,
+                                    move_down=pygame.K_DOWN)
+        self.paddle_next_player = Paddle(color=color_paddle, left=left_B, top=top_B, move_up=pygame.K_UP,
+                                         move_down=pygame.K_DOWN)
+        self.ball = Ball(color=color_ball, rad=rad, speed=speed)
+        self.game = Ponggame(round_point, self.ball)
 
-player_count = 0
-connections = {}
-shared_queue = Queue()
+    def accept_connections(self):
+        while True:
+            self.client_socket, self.addr = self.socket.accept()
+            print(f"{self.client_socket}:{self.addr}")
+            self.receive_data()
 
+    def receive_data(self):
+        while True:
+            self.paddle_next_player.rect_paddle.y = float(self.client_socket.recv(1024).decode("utf-8"))
 
-def threaded_client(conn, player_id):
-    global player_count
-    print(f"Player {player_id} connected from {conn}")
-    # Envoi de l'ID
-    conn.send(str(player_id).encode())
+    def create_thread(self, target):
+        thread = threading.Thread(target=target)
+        thread.daemon = True
+        thread.start()
 
-    connections[player_id] = conn
-    print(connections)
+    def run_game(self):
 
-    # Attend que le client soit prêt
-    ready_signal = conn.recv(1024).decode('utf-8')
-    if ready_signal == "READY":
-        # Mettez un message dans la queue pour indiquer que le client est prêt
-        shared_queue.put(f"READY_{player_id}")
-        print(shared_queue.queue)
+        self.create_thread(self.accept_connections)
 
-    while not (shared_queue.qsize() == 2 and "READY_1" in shared_queue.queue and "READY_2" in shared_queue.queue):
-        pass
+        pygame.display.set_caption("Pong HEY !!!")
 
-    # Envoyez un signal au client pour indiquer que les deux joueurs sont prêts
-    conn.send("START".encode('utf-8'))
+        while self.run:
+            self.screen.fill(color_screan)
+            self.clock.tick(tick)
 
-    while True:
-        reply = {}
-        try:
-            data = conn.recv(2048*2).decode()
-            if not data:
-                print(f"Connection with player {player_id} closed.")
-                break
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.run = False
+
+            keys = pygame.key.get_pressed()
+            self.game.handle_events(keys)
+            self.screen.fill("black")
+
+            send_data = f"{self.paddle_player.rect_paddle.y},{self.ball.pos.x},{self.ball.pos.y},{self.game.game_started}"
+            print(self.game.game_started)
+            if self.client_socket:
+                self.client_socket.send(send_data.encode('utf-8'))
+
+            if self.game.game_started:
+                # ON DRAW
+                self.game.draw_midline(color_midline)
+                self.game.draw_score(color_score)
+                self.paddle_player.draw()
+                self.paddle_next_player.draw()
+                self.ball.draw()
+
+                self.ball.draw_ball_move()
+                self.paddle_player.handle_keys(keys)
+
+                self.ball.check_collision(self.paddle_player, self.paddle_next_player)
+                self.game.scoring()
+
+                pygame.display.update()
             else:
-                reply = json.loads(data)
-                # Traiter les modifs
-                print(f"Received: {reply}")
-                if "position" in reply:
-                    if reply["player_id"] == 1:
-                        if 2 in connections:
-                            connections[2].send(json.dumps(reply).encode("utf-8"))
-                    elif reply["player_id"] == 2:
-                        if 1 in connections:
-                            connections[1].send(json.dumps(reply).encode("utf-8"))
-                elif "started" in reply:
-                    if reply["player_id"] == 1:
-                        if 2 in connections:
-                            connections[2].send(json.dumps(reply).encode("utf-8"))
-                    elif reply["player_id"] == 2:
-                        if 1 in connections:
-                            connections[1].send(json.dumps(reply).encode("utf-8"))
-                elif "ball" in reply:
-                    if reply["player_id"] == 1:
-                        if 2 in connections:
-                            connections[2].send(json.dumps(reply).encode("utf-8"))
-                    elif reply["player_id"] == 2:
-                        if 1 in connections:
-                            connections[1].send(json.dumps(reply).encode("utf-8"))
+                self.game.draw_start(color_start)
+                pygame.display.flip()
 
-        except Exception as e:
-            print(f"Error {player_id}: {e}")
-            break
-
-    del connections[player_id]
-    print("Connection Closed")
-    conn.close()
+        pygame.quit()
 
 
-while True:
-    conn, addr = s.accept()
+if __name__ == '__main__':
+    pygame.init()
 
-    player_count += 1
-    print(f"Connected to: {addr}")
-
-    start_new_thread(threaded_client, (conn, player_count))
+    server = PongServer()
+    server.run_game()
