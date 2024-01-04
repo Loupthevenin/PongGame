@@ -1,5 +1,6 @@
 import pygame
 import random
+from utils import *
 
 
 class Ponggame:
@@ -36,23 +37,27 @@ class Ponggame:
         screan.blit(text_B_surface, text_B_rect)
 
     @staticmethod
-    def draw_start(font_color):
+    def draw_start(font_color, player):
         font_size = 50
         font_color = font_color
         font = pygame.font.Font(None, font_size)
 
-        text_surface = font.render("Appuyez sur ESPACE pour commencer", True, font_color)
+        if player == 1:
+            text_surface = font.render("Appuyez sur ESPACE pour commencer", True, font_color)
+        elif player == 2:
+            text_surface = font.render("Attendre le joueur 1", True, font_color)
+
         text_rect = text_surface.get_rect(center=(width / 2, height / 2))
 
         screan.blit(text_surface, text_rect)
 
-    def scoring(self):
+    def scoring(self, increment=1):
         if not self.check_scoring():
-            if ball_instance.check_points() == "A LOSE":
-                self.score_B += 1
+            if self.ball.check_points() == "A LOSE":
+                self.score_B += increment
                 self.ball.reset_ball()
-            elif ball_instance.check_points() == "B LOSE":
-                self.score_A += 1
+            elif self.ball.check_points() == "B LOSE":
+                self.score_A += increment
                 self.ball.reset_ball()
         elif self.check_scoring():
             # YOU WIN
@@ -131,6 +136,8 @@ class Ball:
         self.speed = speed
         self.direction = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize()
         self.pos = pygame.Vector2(self.x, self.y)
+        self.count = 0
+        self.step = 5
 
     def draw(self):
         pygame.draw.circle(screan, self.color, self.pos, self.rad)
@@ -141,21 +148,30 @@ class Ball:
     def draw_ball_move(self):
         self.move()
         self.draw()
-        pygame.display.flip()
+        # pygame.display.flip()
 
-    def check_collision(self, paddle_A, paddle_B):
+    def speed_up(self):
+        if self.pos.x == width / 2:
+            self.count += 1
+
+        if self.count > self.step:
+            self.speed += 1
+            self.step += 2
+        print(self.count)
+
+    def check_collision(self, paddle_a, paddle_b):
         max_Y = height
         min_Y = 0
         ball_rect = pygame.Rect(self.pos.x - self.rad, self.pos.y - self.rad, 2 * self.rad, 2 * self.rad)
-        self.paddle_A = paddle_A
-        self.paddle_B = paddle_B
+        self.paddle_a = paddle_a
+        self.paddle_b = paddle_b
 
         # Collision : mur Haut
         if self.pos.y + self.rad > max_Y or self.pos.y - self.rad < min_Y:
             self.direction.y *= -1
 
         # Collision Paddle
-        if self.paddle_A.rect_paddle.colliderect(ball_rect) or self.paddle_B.rect_paddle.colliderect(ball_rect):
+        if self.paddle_a.rect_paddle.colliderect(ball_rect) or self.paddle_b.rect_paddle.colliderect(ball_rect):
             self.direction.x *= -1
 
     def check_points(self) -> str:
@@ -171,14 +187,14 @@ class Ball:
 
     def reset_ball(self):
         self.pos = pygame.Vector2(self.x, self.y)
+        self.direction = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize()
+        self.count = 0
         pygame.time.wait(300)
 
 
 pygame.init()
 
 
-width = 1200
-height = 700
 screan = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Pong")
 clock = pygame.time.Clock()
@@ -186,10 +202,10 @@ clock = pygame.time.Clock()
 
 # Set up
 
-paddle_A = Paddle((240, 255, 255), 20, 300, pygame.K_z, pygame.K_s)
-paddle_B = Paddle((240, 255, 255), 1170, 300, pygame.K_UP, pygame.K_DOWN)
-ball_instance = Ball((240, 250, 250), 10, 15)
-game = Ponggame(5, ball_instance)
+paddle_A = Paddle(color_paddle, left_A, top_A, pygame.K_z, pygame.K_s)
+paddle_B = Paddle(color_paddle, left_A, top_B, pygame.K_UP, pygame.K_DOWN)
+ball_instance = Ball(color_ball, rad, speed)
+game = Ponggame(round_point, ball_instance)
 
 run = True
 
@@ -224,11 +240,10 @@ if __name__ == '__main__':
             ball_instance.check_collision(paddle_A, paddle_B)
 
             game.scoring()
-
-            pygame.display.update()
         # Starting
         else:
-            game.draw_start((240, 250, 250))
-            pygame.display.flip()
+            game.draw_start((240, 250, 250), 1)
+
+        pygame.display.update()
 
     pygame.quit()
