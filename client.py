@@ -35,7 +35,7 @@ class PongClient:
     def receive_data(self):
         while True:
             try:
-                data = self.client_socket.recv(1024).decode("utf-8")
+                data = self.client_socket.recv(128).decode("utf-8")
                 data = data.split(',')
                 self.started = bool(data[3])
                 self.paddle_A.rect_paddle.y = float(data[0])
@@ -90,6 +90,5 @@ class PongClient:
 
 
 if __name__ == '__main__':
-    pygame.init()
     client = PongClient()
     client.run_game()

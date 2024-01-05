@@ -38,7 +38,7 @@ class PongServer:
 
     def receive_data(self):
         while True:
-            self.paddle_B.rect_paddle.y = float(self.client_socket.recv(1024).decode("utf-8"))
+            self.paddle_B.rect_paddle.y = float(self.client_socket.recv(128).decode("utf-8"))
 
     @staticmethod
     def create_thread(target):

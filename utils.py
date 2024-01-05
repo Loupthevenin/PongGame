@@ -6,7 +6,7 @@ color_screan = (0, 0, 0)
 tick = 60
 
 # server
-host_server = "172.19.11.59"
+host_server = "192.168.1.42"
 port_server = 5555
 player_A = "A"
 player_B = "B"
